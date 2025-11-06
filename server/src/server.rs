@@ -1,4 +1,4 @@
-use std::{io::Error, panic, sync::{Arc, Mutex, atomic::AtomicBool}, thread::JoinHandle};
+use std::{io::Error, panic, sync::{Arc, Mutex, atomic::{AtomicBool, Ordering}}, thread::JoinHandle};
 
 use crossbeam_channel::{Receiver, Select, Sender};
 use lsp_server::{Connection, IoThreads, Message, ProtocolError, RequestId, ResponseError};
@@ -8,7 +8,7 @@ use serde_json::json;
 use nix;
 use tracing::{error, info, warn};
 
-use crate::{constants::{DEBUG_THREADS, EXTENSION_VERSION}, core::{file_mgr::FileMgr, odoo::SyncOdoo}, threads::{delayed_changes_process_thread, message_processor_thread_main, DelayedProcessingMessage}, S, crash_buffer};
+use crate::{S, constants::{DEBUG_THREADS, EXTENSION_VERSION}, core::{file_mgr::FileMgr, odoo::SyncOdoo}, crash_buffer, threads::{DelayedProcessingMessage, delayed_changes_process_thread, message_processor_thread_main}, tool_api::tool_api::CAN_TOOL_API_RUN};
 
 
 /**
@@ -26,10 +26,12 @@ pub struct Server {
     req_sender_s_to_main: Sender<Message>, //channel server to main threads. Will handle new request message (client -> s -> main and back)
     delayed_process_thread: JoinHandle<()>,
     sender_to_delayed_process: Sender<DelayedProcessingMessage>, //unique channel to delayed process thread
-    sync_odoo: Arc<Mutex<SyncOdoo>>,
+    pub sync_odoo: Arc<Mutex<SyncOdoo>>,
     interrupt_rebuild_boolean: Arc<AtomicBool>, //ref to the one on sync_odoo
     terminate_rebuild_boolean: Arc<AtomicBool>, //ref to the one on sync_odoo
     running_request_ids: Arc<Mutex<Vec<RequestId>>>, //ref to the one on sync_odoo, but with dedicated mutex
+
+    pub spy_thread: Option<JoinHandle<()>>,
 }
 
 #[derive(Debug)]
@@ -112,6 +114,7 @@ impl Server {
             interrupt_rebuild_boolean: interrupt_rebuild_boolean,
             terminate_rebuild_boolean,
             running_request_ids: running_request_ids,
+            spy_thread: None,
         }
     }
 
@@ -253,6 +256,10 @@ impl Server {
         });
         self.req_sender_s_to_main.send(shutdown_notification.clone()).unwrap();
         self.res_sender_s_to_main.send(shutdown_notification.clone()).unwrap();
+        CAN_TOOL_API_RUN.store(false, Ordering::SeqCst);
+        if let Some(spy_thread) = self.spy_thread.take() {
+            spy_thread.join().unwrap();
+        }
         info!(message);
     }
 

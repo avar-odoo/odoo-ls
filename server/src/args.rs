@@ -59,6 +59,9 @@ pub struct Cli {
     #[arg(long)]
     pub config_path: Option<String>,
 
+    //enable connection on localhost:8072 for odoo-ls-spy debugging tool
+    #[arg(long)]
+    pub spy: bool,
 }
 
 #[derive(ValueEnum, Clone, Debug)]

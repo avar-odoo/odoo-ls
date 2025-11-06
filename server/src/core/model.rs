@@ -87,6 +87,10 @@ impl Model {
         res
     }
 
+    pub fn get_name(&self) -> String {
+        self.name.to_string()
+    }
+
     pub fn add_symbol(&mut self, session: &mut SessionInfo, symbol: Rc<RefCell<Symbol>>) {
         if self.symbols.contains(&symbol) {
             return;

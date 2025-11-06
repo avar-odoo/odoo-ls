@@ -79,6 +79,9 @@ fn main() {
     info!("Compiled setting: DEBUG_STEPS: {}", DEBUG_STEPS);
     info!("Compiled setting: DEBUG_REBUILD_NOW: {}", DEBUG_REBUILD_NOW);
     info!("Operating system: {}", std::env::consts::OS);
+    if cli.spy {
+        info!("Spy mode enabled");
+    }
     info!("");
 
     if cli.parse {
@@ -97,6 +100,9 @@ fn main() {
         cli.config_path.map(|config_path| {
             serv.set_config_path(config_path.clone());
         });
+        if cli.spy {
+            serv.create_spy_connection(serv.sync_odoo.clone());
+        }
         let sender_panic = serv.connection.as_ref().unwrap().sender.clone();
         std::panic::set_hook(Box::new(move |panic_info| {
             let backtrace = std::backtrace::Backtrace::capture();

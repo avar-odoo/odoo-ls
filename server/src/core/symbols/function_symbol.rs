@@ -3,6 +3,7 @@ use std::{cell::RefCell, collections::HashMap, rc::{Rc, Weak}};
 use lsp_types::Diagnostic;
 use ruff_python_ast::{AtomicNodeIndex, Expr, ExprCall};
 use ruff_text_size::{TextRange, TextSize};
+use serde_json::json;
 use weak_table::{PtrWeakHashSet, PtrWeakKeyHashMap};
 
 use crate::{constants::{BuildStatus, BuildSteps, OYarn, SymType}, core::{evaluation::{Context, Evaluation}, file_mgr::NoqaInfo, model::Model}, oyarn, threads::SessionInfo};
@@ -209,5 +210,18 @@ impl FunctionSymbol {
             }
         }
         result
+    }
+
+    pub fn to_json(&self) -> serde_json::Value {
+        json!({
+            "type": SymType::FUNCTION.to_string(),
+            "doc_string": self.doc_string,
+            "is_external": self.is_external,
+            "range": json!({
+                "start": self.range.start().to_u32(),
+                "end": self.range.end().to_u32(),
+            }),
+            "evaluations": self.evaluations.iter().map(|eval| json!("to implement")).collect::<Vec<serde_json::Value>>(),
+        })
     }
 }

@@ -132,6 +132,13 @@ pub fn compare_semver(a: &str, b: &str) -> std::cmp::Ordering {
     va.cmp(&vb)
 }
 
+pub fn tree_yarn_to_string(tree: &Tree) -> (Vec<String>, Vec<String>) {
+    (
+        tree.0.iter().map(|x| x.to_string()).collect(),
+        tree.1.iter().map(|x| x.to_string()).collect(),
+    )
+}
+
 pub trait ToFilePath {
     fn to_file_path(&self) -> Result<PathBuf, ()>;
 }
