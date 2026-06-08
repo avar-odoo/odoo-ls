@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use lsp_types::NumberOrString;
 use odoo_ls_server::core::odoo::SyncOdoo;
+use odoo_ls_server::core::symbols::SymbolTable;
 use odoo_ls_server::core::symbols::symbol_keys::SourceFileKey;
 use odoo_ls_server::odoo_version::OdooVersion;
 use odoo_ls_server::threads::SessionInfo;
@@ -13,7 +14,7 @@ use crate::test_utils::diag_on_line;
 const ACCESS_LINE: u32 = 19;
 
 fn revalidate(session: &mut SessionInfo, file_sym: SourceFileKey) {
-    session.st_mut().invalidate_sub_functions(file_sym);
+    SymbolTable::invalidate_sub_functions(session, file_sym);
     session.sync_odoo.add_to_validations(file_sym);
     SyncOdoo::process_rebuilds(session, false);
 }
