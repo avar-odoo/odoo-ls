@@ -2,7 +2,7 @@
 
 use crate::core::symbols::symbol_keys::{SourceFileKey, XmlRecordKey};
 use crate::threads::SessionInfo;
-use once_cell::sync::Lazy;
+use std::sync::LazyLock;
 
 // ============================================================================
 // Record Creation Hooks
@@ -20,7 +20,7 @@ pub struct RecordCreationHook {
 
 /// Registry of all record creation hooks
 #[allow(non_upper_case_globals)]
-static record_creation_hooks: Lazy<Vec<RecordCreationHook>> = Lazy::new(|| {
+static record_creation_hooks: LazyLock<Vec<RecordCreationHook>> = LazyLock::new(|| {
     vec![
         // Hook: Track res.lang records for language validation
         RecordCreationHook {
@@ -68,7 +68,7 @@ pub struct FileUnloadHook {
 
 /// Registry of file unload hooks
 #[allow(non_upper_case_globals)]
-static file_unload_hooks: Lazy<Vec<FileUnloadHook>> = Lazy::new(|| {
+static file_unload_hooks: LazyLock<Vec<FileUnloadHook>> = LazyLock::new(|| {
     vec![FileUnloadHook {
         // Hook: Remove language codes when data file is unloaded
         func: |session, file| {
