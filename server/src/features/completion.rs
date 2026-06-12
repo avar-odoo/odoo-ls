@@ -4,13 +4,13 @@ use crate::core::evaluation::{
     Evaluation, EvaluationSymbol, EvaluationSymbolPtr, EvaluationSymbolWeak, HookName
 };
 use crate::core::evaluation_context::{Context, ContextKey, ContextValue};
+use crate::core::evaluation_utils::DeepFieldEvalWalker;
 use crate::core::file_mgr::FileInfo;
 use crate::core::import_resolver;
 use crate::core::odoo::SyncOdoo;
 use crate::core::symbols::{FunctionSymbol, ModuleSymbol};
 use crate::core::symbols::symbol_keys::{ClassKey, ModuleKey, SourceFileKey, SymbolKey};
 use crate::core::symbols::storage::SymbolTable;
-use crate::core::symbols::VariableSymbol;
 use crate::features::ast_utils::AstUtils;
 use crate::features::features_utils::FeaturesUtils;
 use crate::threads::SessionInfo;
@@ -1046,7 +1046,7 @@ fn add_nested_field_names(
     specific_field_type: &Option<OYarn>,
 ){
     let split_expr: Vec<_> = field_prefix.split(".").collect();
-    let mut obj = Some(parent);
+    let mut deep_field_walker = DeepFieldEvalWalker::new(parent, from_module);
     let mut date_mode = false;
     for (index, &name) in split_expr.iter().enumerate() {
         if add_date_completions && date_mode {
@@ -1068,55 +1068,40 @@ fn add_nested_field_names(
             date_mode = false;
             continue;
         }
-        if obj.is_none() {
+        let Some(base_symbol) = deep_field_walker.get_model_symbol(session) else {
             break;
-        }
-        if let Some(object) = obj {
-            if index == split_expr.len() - 1 {
-                let all_symbols = SymbolTable::all_members(object, session,  true, true, false, from_module, false);
-                for (_symbol_name, symbols) in all_symbols {
-                    //we could use symbol_name to remove duplicated names, but it would hide functions vs variables
-                    if _symbol_name.starts_with(name) {
-                        let mut found_one = false;
-                        for (final_sym, dep) in symbols.iter() { //search for at least one that is a field
-                            if dep.is_none() && (specific_field_type.is_none() || SymbolTable::is_specific_field(session, *final_sym, &["Many2one", "One2many", "Many2many", specific_field_type.as_ref().unwrap().as_str()])){
-                                items.push(build_completion_item_from_symbol(session, vec![*final_sym], Context::default()));
-                                found_one = true;
-                                continue;
-                            }
+        };
+        if index == split_expr.len() - 1 {
+            let all_symbols = SymbolTable::all_members(
+                base_symbol,
+                session,
+                true,
+                true,
+                false,
+                from_module,
+                true,
+                false,
+            );
+            for (symbol_name, symbols) in all_symbols {
+                //we could use symbol_name to remove duplicated names, but it would hide functions vs variables
+                if symbol_name.starts_with(name) {
+                    let mut found_one = false;
+                    for (final_sym, dep) in symbols.iter() {
+                        if dep.is_none() && (specific_field_type.is_none() || SymbolTable::is_specific_field(session, *final_sym, &["Many2one", "One2many", "Many2many", specific_field_type.as_ref().unwrap().as_str()])){
+                            items.push(build_completion_item_from_symbol(session, vec![*final_sym], &symbol_name, Context::default()));
+                            found_one = true;
                         }
-                        if found_one {
-                            continue;
-                        }
+                    }
+                    if found_one {
+                        continue;
                     }
                 }
-            } else {
-                let (symbols, _diagnostics) = SymbolTable::get_member_symbol(session,
-                    object,
-                    name,
-                    from_module,
-                    false,
-                    true,
-                    false,
-                    true,
-                    false);
-                if symbols.is_empty() {
-                    break;
-                }
-                obj = None;
-                for s in symbols {
-                    if let SymbolKey::Variable(v) = s && SymbolTable::is_specific_field(session, s, &["Many2one", "One2many", "Many2many"]) {
-                        let models = VariableSymbol::get_relational_model(v, session, from_module);
-                        //only handle it if there is only one main symbol for this model
-                        if models.len() == 1 {
-                            obj = Some(models[0].into());
-                            break;
-                        }
-                    }
-                    if add_date_completions && SymbolTable::is_specific_field(session, s, &["Date"]) {
-                        date_mode = true;
-                        break;
-                    }
+            }
+        } else {
+            let field_symbols = deep_field_walker.get_model_fields(session, base_symbol, name);
+            for symbol in field_symbols.iter() {
+                if SymbolTable::is_specific_field(session, *symbol, &["Date", "Datetime"]) {
+                    date_mode = true;
                 }
             }
         }

@@ -1,14 +1,17 @@
 use itertools::Itertools;
 use ruff_python_ast::{Expr, ExprCall, Keyword};
 use ruff_text_size::{Ranged, TextRange, TextSize};
+use crate::core::evaluation_utils::DeepFieldEvalWalker;
 use crate::core::file_mgr::FileMgr;
 use crate::core::odoo::SyncOdoo;
 use crate::core::symbols::function_symbol::Argument;
-use crate::core::symbols::symbol_keys::{ClassKey, ModuleKey, SourceFileKey, SymbolKey, Wk};
+use crate::core::symbols::storage::xml::xml_field_symbol::XmlFieldName;
+use crate::core::symbols::symbol_keys::{ModelSymbolKey, ModuleKey, SourceFileKey, SymbolKey, Wk, XmlId, XmlRecordKey};
 use crate::core::symbols::storage::SymbolTable;
-use crate::core::symbols::{FunctionSymbol, VariableSymbol};
+use crate::core::symbols::FunctionSymbol;
 use crate::tree::OYarnExt;
 use crate::utils::HashMap;
+use std::path::PathBuf;
 
 use crate::constants::{SymType};
 use crate::constants::OYarn;
@@ -138,53 +141,53 @@ impl FeaturesUtils {
 
     fn find_nested_fields(
         session: &mut SessionInfo,
-        base_symbol: ClassKey,
+        base_symbol: ModelSymbolKey,
         from_module: Option<ModuleKey>,
         field_range: &TextRange,
         field_name: &str,
         offset: &usize,
     ) -> Vec<(SymbolKey, TextRange)> {
-        if session.st()[base_symbol]._model.is_none() {
+        if let SymbolKey::Class(class) = base_symbol.into()
+        && session.st()[class]._model.is_none() {
             return vec![];
         }
-        let mut parent_object = Some(base_symbol);
-        let mut range_start = field_range.start() + TextSize::new(1);
-        for name in field_name.split(".") {
-            if parent_object.is_none() {
-                break;
-            }
-            let range_end = range_start + TextSize::new((name.len() + 1) as u32);
-            let cursor_section = TextRange::new(range_start, range_end).contains(TextSize::new(*offset as u32));
-            if cursor_section {
-                let fields = SymbolTable::get_member_symbol(session, parent_object.unwrap().into(), name, from_module, false, true, false, true, false).0;
-                return fields.into_iter().map(|f| (f, TextRange::new(range_start, range_end - TextSize::new(1)))).collect();
-            } else {
-                let (symbols, _diagnostics) = SymbolTable::get_member_symbol(session,
-                    parent_object.unwrap().into(),
-                    name,
-                    from_module,
-                    false,
-                    true,
-                    false,
-                    true,
-                    false);
-                if symbols.is_empty() {
-                    break;
-                }
-                parent_object = None;
-                for s in symbols {
-                    if let SymbolKey::Variable(variable_key) = s && SymbolTable::is_specific_field(session, s, &["Many2one", "One2many", "Many2many"]) {
-                        let models = VariableSymbol::get_relational_model(variable_key, session, from_module);
-                        if models.len() == 1 {
-                            parent_object = Some(models[0]);
-                            break;
-                        }
+        // Search in each str subsection where the cursor is and find the corresponding index + range
+        let cursor_index = field_name
+            .split(".")
+            .enumerate()
+            .try_fold(
+                field_range.start() + TextSize::new(1),
+                |range_start, (idx, name)| {
+                    let range_end = range_start + TextSize::new((name.len() + 1) as u32);
+                    if TextRange::new(range_start, range_end)
+                        .contains(TextSize::new(*offset as u32))
+                    {
+                        // Err is the result we want, it breaks the iteration
+                        Err((
+                            idx,
+                            TextRange::new(range_start, range_end - TextSize::new(1)),
+                        ))
                     } else {
-                        break;
+                        Ok(range_end)
                     }
-                }
+                },
+            )
+            .err();
+        let Some((cursor_index, cursor_range)) = cursor_index else {
+            return vec![];
+        };
+        let mut deep_field_walker = DeepFieldEvalWalker::new(base_symbol.into(), from_module);
+        for (idx, field_sub_name) in field_name.split(".").map(|x| x.to_string()).enumerate() {
+            let Some(base_symbol) = deep_field_walker.get_model_symbol(session) else {
+                break;
+            };
+            let field_symbols = deep_field_walker.get_model_fields(session, base_symbol, &field_sub_name);
+            if cursor_index == idx {
+                return field_symbols
+                    .into_iter()
+                    .map(|f| (f, cursor_range))
+                    .collect();
             }
-            range_start = range_end;
         }
         vec![]
     }
@@ -200,7 +203,7 @@ impl FeaturesUtils {
         let Some(SymbolKey::Class(parent_class)) = session.st().get_in_parents(scope, &[SymType::CLASS], true) else {
             return vec![];
         };
-        FeaturesUtils::find_nested_fields(session, parent_class, from_module, field_range, field_name, offset)
+        FeaturesUtils::find_nested_fields(session, parent_class.into(), from_module, field_range, field_name, offset)
     }
 
     fn find_domain_param_symbols(
