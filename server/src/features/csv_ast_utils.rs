@@ -121,9 +121,9 @@ impl CsvAstUtils {
         let mut results = vec![];
         let module = session.st().find_module(file_symbol);
         let Some(model) = session.sync_odoo.models.get(model_name).cloned() else {return vec![];};
-        let model_syms = model.borrow().get_main_symbols(session, module);
-        let Some(&main_symbol) = model_syms.first() else {return results;};
-        drop(model_syms);
+        let Some(main_symbol) = model.borrow().get_main_symbols(session, module).next() else {
+            return results;
+        };
         let mut headers = vec![];
         if !csv_reader.has_headers() {
             return results;

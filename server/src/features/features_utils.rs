@@ -120,7 +120,7 @@ impl FeaturesUtils {
         let Some(model) = session.sync_odoo.models.get(model_name).cloned() else {
             return vec![];
         };
-        let main_syms = model.borrow().get_main_symbols(session, from_module);
+        let main_syms = model.borrow().get_main_symbols(session, from_module).collect::<Vec<_>>();
         main_syms.iter().flat_map(|&main_sym| SymbolTable::get_member_symbol(session, main_sym.into(), field_value, from_module, false, true, false, true, false).0).collect()
     }
 

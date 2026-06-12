@@ -753,8 +753,9 @@ fn complete_string_literal(session: &mut SessionInfo, file: SourceFileKey, expr_
 
 
                         if let Some(current_module) = current_module {
-                            let model_class_syms = model.borrow().get_main_symbols(session, None);
-                            let modules = model_class_syms.iter().flat_map(|&model_key|
+                            let model_ref = model.borrow();
+                            let model_class_definitions = model_ref.get_main_symbols(session, None);
+                            let modules = model_class_definitions.flat_map(|model_key|
                                 session.st().find_module(model_key));
                             let required_modules = modules.filter(|&module|
                                 !ModuleSymbol::is_in_deps(session.st(), current_module, &session.st()[module].dir_name));
@@ -846,9 +847,11 @@ fn complete_string_literal(session: &mut SessionInfo, file: SourceFileKey, expr_
                 let Some(model) = session.sync_odoo.models.get(model_name).cloned() else {
                     break;
                 };
-                let main_syms = model.borrow().get_main_symbols(session, current_module);
-                main_syms.iter().for_each(|&model_sym| {
-                    add_model_attributes(session, &mut items, current_module, model_sym.into(), false, true, false, expr_string_literal.value.to_str(), &Some(Sy!("Many2one")))
+                // Only python main symbols, because it is relation defining check
+                // Needs deploying Odoo and checking
+                let main_syms = model.borrow().get_main_symbols(session, current_module).collect::<Vec<_>>();
+                main_syms.iter().filter_map(|s| s.as_class_key()).for_each(|class_key| {
+                    add_model_attributes(session, &mut items, current_module, class_key.into(), false, true, false, expr_string_literal.value.to_str(), &Some(Sy!("Many2one")))
                 });
             },
             ExpectedType::CLASS(_) => {},

@@ -1951,7 +1951,7 @@ impl SymbolTable {
                     from_module = session.st().find_module(target);
                 }
                 if let Some(from_module) = from_module {
-                    let model_symbols = Model::get_full_model_symbols(model.clone(), session, from_module);
+                    let model_symbols = Model::get_full_model_classes(model.clone(), session, Some(from_module));
                     for model_symbol in model_symbols {
                         if target == model_symbol || visited_classes.contains(&model_symbol) {
                             continue;
@@ -1969,7 +1969,7 @@ impl SymbolTable {
                     }
                     for model_inherits_symbol in model.clone().borrow().get_inherits_models(session, from_module) {
                         //only fields are visible on inherits, not methods
-                        let model_symbols = Model::get_full_model_symbols(model_inherits_symbol, session, from_module);
+                        let model_symbols = Model::get_full_model_classes(model_inherits_symbol, session, Some(from_module));
                         for model_symbol in model_symbols {
                             if target == model_symbol || visited_classes.contains(&model_symbol) {
                                 continue;
