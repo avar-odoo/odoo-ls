@@ -1487,6 +1487,9 @@ impl SymbolTable {
         iter
     }
 
+    /// Returns all members of a symbol, including sub-symbols, base class elements, and model symbols.
+    /// Result is HashMap<name, Vec<symbol)>
+    /// where name is the member name, symbol is the SymbolKey of the member.
     //store in result all available members for symbol: sub symbols, base class elements and models symbols
     //TODO is order right of Vec in HashMap? if we take first or last in it, do we have the last effective value?
     pub fn all_members(
@@ -1497,23 +1500,33 @@ impl SymbolTable {
         only_methods: bool,
         from_module: Option<ModuleKey>,
         is_super: bool
-    ) -> HashMap<OYarn, Vec<(SymbolKey, Option<OYarn>)>> {
-        let mut result: HashMap<OYarn, Vec<(SymbolKey, Option<OYarn>)>> = HashMap::default();
+    ) -> HashMap<OYarn, Vec<SymbolKey>> {
+        let mut result: HashMap<OYarn, Vec<SymbolKey>> = HashMap::default();
         let mut acc = HashSet::default();
         Self::_all_members(symbol, session, &mut result, with_co_models, only_fields, only_methods, from_module, &mut acc, is_super);
         return  result;
     }
 
-    fn _all_members(symbol_key: SymbolKey, session: &mut SessionInfo, result: &mut HashMap<OYarn, Vec<(SymbolKey, Option<OYarn>)>>, with_co_models: bool, only_fields: bool, only_methods: bool, from_module: Option<ModuleKey>, acc: &mut HashSet<SymbolKey>, is_super: bool) {
+    fn _all_members(
+        symbol_key: SymbolKey,
+        session: &mut SessionInfo,
+        result: &mut HashMap<OYarn, Vec<SymbolKey>>,
+        with_co_models: bool,
+        only_fields: bool,
+        only_methods: bool,
+        from_module: Option<ModuleKey>,
+        acc: &mut HashSet<SymbolKey>,
+        is_super: bool
+    ) {
         if acc.contains(&symbol_key) {
             return;
         }
         acc.insert(symbol_key);
-        let mut append_result = |name: OYarn, symbol: SymbolKey, dep: Option<OYarn>| {
+        let mut append_result = |name: OYarn, symbol: SymbolKey| {
             if let Some(vec) = result.get_mut(&name) {
-                vec.push((symbol, dep));
+                vec.push(symbol);
             } else {
-                result.insert(name, vec![(symbol, dep)]);
+                result.insert(name, vec![symbol]);
             }
         };
         match symbol_key {
@@ -1525,7 +1538,7 @@ impl SymbolTable {
                             continue;
                         }
                         let name = session.st().name(symbol).clone();
-                        append_result(name, symbol, None);
+                        append_result(name, symbol);
                     }
                 }
                 let model_option = session.st()[class_key]._model.as_ref().and_then(|model_data|
@@ -1540,13 +1553,12 @@ impl SymbolTable {
                         }
                         let model_sym = &session.st()[model_key];
                         let all_symbols = model_sym.children();
-                        let model_name = model_sym.name.clone();
                         for s in all_symbols {
                             if (only_fields && !Self::is_field(session, s)) || (only_methods && !matches!(s, SymbolKey::Function(_))) {
                                 continue;
                             }
                             let name = session.st().name(s).clone();
-                            append_result(name, s, Some(model_name.clone()));
+                            append_result(name, s);
                         }
                     }
                     for (model_key, dependency) in model_inherits_symbols {
@@ -1556,11 +1568,10 @@ impl SymbolTable {
                         let model_sym = &session.st()[model_key];
                         // for inherits symbols, we only add fields
                         let all_symbols = model_sym.children();
-                        let model_name = model_sym.name.clone();
                         let fields = all_symbols.into_iter().filter(|&s| Self::is_field(session, s)).collect::<Vec<_>>();
                         for s in fields {
                             let name = session.st().name(s).clone();
-                            append_result(name, s, Some(model_name.clone()));
+                            append_result(name, s);
                         }
                     }
                 }
@@ -1581,7 +1592,7 @@ impl SymbolTable {
                 session.st().all_symbols(symbol_key).into_iter().for_each(|s|
                     if !(only_fields && !Self::is_field(session, s)) {
                         let name = session.st().name(s).clone();
-                        append_result(name, s, None);
+                        append_result(name, s);
                     }
                 )
             }
@@ -1849,7 +1860,11 @@ impl SymbolTable {
         false
     }
 
-    pub fn all_fields(symbol: SymbolKey, session: &mut SessionInfo, from_module: Option<ModuleKey>) -> HashMap<OYarn, Vec<(SymbolKey, Option<OYarn>)>> {
+    pub fn all_fields(
+        symbol: SymbolKey,
+        session: &mut SessionInfo,
+        from_module: Option<ModuleKey>,
+    ) -> HashMap<OYarn, Vec<SymbolKey>> {
         Self::all_members(symbol, session, true, true, false, from_module, false)
     }
 

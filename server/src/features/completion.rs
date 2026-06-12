@@ -1079,15 +1079,14 @@ fn add_nested_field_names(
                 true,
                 false,
                 from_module,
-                true,
                 false,
             );
             for (symbol_name, symbols) in all_symbols {
                 //we could use symbol_name to remove duplicated names, but it would hide functions vs variables
                 if symbol_name.starts_with(name) {
                     let mut found_one = false;
-                    for (final_sym, dep) in symbols.iter() {
-                        if dep.is_none() && (specific_field_type.is_none() || SymbolTable::is_specific_field(session, *final_sym, &["Many2one", "One2many", "Many2many", specific_field_type.as_ref().unwrap().as_str()])){
+                    for final_sym in symbols.iter() {
+                        if specific_field_type.is_none() || SymbolTable::is_specific_field(session, *final_sym, &["Many2one", "One2many", "Many2many", specific_field_type.as_ref().unwrap().as_str()]){
                             items.push(build_completion_item_from_symbol(session, vec![*final_sym], &symbol_name, Context::default()));
                             found_one = true;
                         }
@@ -1119,10 +1118,18 @@ fn add_model_attributes(
     attribute_name: &str,
     specific_field_type: &Option<OYarn>,
 ){
-    let all_symbols = SymbolTable::all_members(parent_sym, session, true, only_fields, only_methods, from_module, is_super);
+    let all_symbols = SymbolTable::all_members(
+        parent_sym,
+        session,
+        true,
+        only_fields,
+        only_methods,
+        from_module,
+        is_super,
+    );
     for (symbol_name, symbols) in all_symbols {
         //we could use symbol_name to remove duplicated names, but it would hide functions vs variables
-        let Some((final_sym, _dep)) = symbols.first() else {
+        let Some(final_sym) = symbols.first() else {
             continue;
         };
         if let Some(field_type) = specific_field_type {

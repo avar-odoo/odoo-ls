@@ -160,9 +160,17 @@ impl PythonOdooBuilder {
             }
         }
         //Add inherits from delegate=True from fields
-        let all_fields = SymbolTable::all_members(self.symbol.into(), session, false, true, false, None, false);
+        let all_fields = SymbolTable::all_members(
+            self.symbol.into(),
+            session,
+            false,
+            true,
+            false,
+            None,
+            false,
+        );
         for (field_name, symbols) in all_fields.iter() {
-            for (symbol, _deps) in symbols.iter() {
+            for symbol in symbols.iter() {
                 let Some(evals) = session.st().evaluations(*symbol) else { continue };
                 for eval in evals.clone() {
                     let scope = session.st().get_file(self.symbol.into()).map(SymbolKey::from);
