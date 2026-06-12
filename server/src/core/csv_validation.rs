@@ -6,7 +6,7 @@ use tracing::info;
 
 use crate::{
     Sy, constants::{BuildStatus, BuildSteps, DEBUG_STEPS, OYarn}, core::{
-        diagnostics::{DiagnosticCode, create_diagnostic}, evaluation_utils::DeepFieldEvalWalker, file_mgr::FileInfo, symbols::symbol_keys::{CsvFileKey, ModuleKey}
+        diagnostics::{DiagnosticCode, create_diagnostic}, evaluation_utils::DeepFieldEvalWalker, file_mgr::FileInfo, symbols::{SymbolTable, symbol_keys::{CsvFileKey, ModuleKey}}
     }, features::csv_ast_utils::CsvFieldIter, threads::SessionInfo
 };
 use std::{cell::RefCell, rc::Rc};
