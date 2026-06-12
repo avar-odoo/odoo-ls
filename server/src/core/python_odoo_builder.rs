@@ -1,11 +1,12 @@
 use std::rc::Rc;
 use std::cell::RefCell;
 use ruff_python_ast::Expr;
-use lsp_types::Diagnostic;
+use lsp_types::{Diagnostic, Position, Range};
 use tracing::error;
 
 use crate::constants::OYarn;
 use crate::core::evaluation_context::ContextKey;
+use crate::core::diagnostics::{DiagnosticCode, create_diagnostic};
 use crate::core::model::{Model, ModelData};
 use crate::core::symbols::{ClassSymbol, ModuleSymbol};
 use crate::core::symbols::storage::SymbolTable;
@@ -59,9 +60,26 @@ impl PythonOdooBuilder {
             ModuleSymbol::insert_xml_id(session.st_mut(), module, xml_id_model_name, XmlId::PythonClass(sym));
         }
         match session.sync_odoo.models.get(&model_name).cloned() {
-            Some(model) => model.borrow_mut().add_symbol(session, sym),
+            Some(model) => {
+                if model.borrow().has_xml_symbols(&session.st()) {
+                    if let Some(diagnostic) =
+                        create_diagnostic(&session, DiagnosticCode::OLS03303, &[&model_name])
+                    {
+                        diagnostics.push(Diagnostic {
+                            range: Range::new(
+                                Position::new(session.st().range(sym.into()).start().to_u32(), 0),
+                                Position::new(session.st().range(sym.into()).end().to_u32(), 0),
+                            ),
+                            ..diagnostic
+                        });
+                    }
+                } else {
+                    model.borrow_mut().add_symbol(session, sym)
+                }
+            }
             None => {
-                let model = Model::new(model_name.clone(), sym);
+                let mut model = Model::new(model_name.clone());
+                model.add_symbol(session, sym);
                 session.sync_odoo.models.insert(model_name.clone(), Rc::new(RefCell::new(model)));
             }
         }

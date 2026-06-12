@@ -2,6 +2,7 @@ use crate::core::diagnostics::{create_diagnostic, DiagnosticCode};
 use crate::core::evaluation_context::{Context, ContextKey, ContextValue};
 use crate::core::evaluation_utils::DeepFieldEvalWalker;
 use crate::core::odoo::SyncOdoo;
+use crate::core::symbols::storage::xml::xml_field_symbol::XmlFieldName;
 use crate::core::symbols::symbol_keys::{FunctionKey, KeyValidator, ModuleKey, SourceFileKey, SymbolKey, Wk};
 use crate::core::symbols::storage::SymbolTable;
 use crate::core::symbols::FunctionSymbol;
@@ -1907,14 +1908,29 @@ impl Evaluation {
                     }
                     break;
                 }
-                for s in field_symbols {
-                    if SymbolTable::is_specific_field(session, s, &["Properties"]) {
-                        //TODO handle properties field
-                        //property field, not handled for now. Skip the parsing to not generate diagnostics
-                        break 'split_name
-                    }
-                    if SymbolTable::is_specific_field(session, s, &["Date"]) {
-                        date_mode = true;
+                for symbol in field_symbols {
+                    match symbol {
+                        SymbolKey::Variable(_) => {
+                            if SymbolTable::is_specific_field(session, symbol, &["Properties"]) {
+                                //TODO handle properties field
+                                //property field, not handled for now. Skip the parsing to not generate diagnostics
+                                break 'split_name
+                            }
+                            if SymbolTable::is_specific_field(session, symbol, &["Date", "Datetime"]) {
+                                date_mode = true;
+                            }
+                        }
+                        SymbolKey::XmlRecord(key) => {
+                            let Some(ttype) =
+                                session.st()[key].get_field_text(XmlFieldName::Type, session.st())
+                            else {
+                                continue;
+                            };
+                            if ["date", "datetime"].contains(&ttype.as_str()) {
+                                date_mode = true;
+                            }
+                        }
+                        _ => {}
                     }
                 }
 
