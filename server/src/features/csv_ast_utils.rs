@@ -229,7 +229,7 @@ impl CsvAstUtils {
                     if let Some(record_key) = data.as_xml_record_key() {
                         let record = &session.st()[record_key];
                         let Some(record_xml_id) = &record.xml_id else {continue;};
-                        if record.range.contains_range(field_range) && record_xml_id.as_str() == field_data.as_str() {
+                        if record.range.contains_range(field_range) && field_data == *record_xml_id {
                             if let Some(xml_id) = record.fields().get("id") {
                                 results.push(GotoSource {
                                     source: (*xml_id).into(),

@@ -8,6 +8,7 @@ use crate::core::evaluation_utils::DeepFieldEvalWalker;
 use crate::core::file_mgr::FileInfo;
 use crate::core::import_resolver;
 use crate::core::odoo::SyncOdoo;
+use crate::core::symbols::storage::xml::xml_field_symbol::XmlFieldName;
 use crate::core::symbols::{FunctionSymbol, ModuleSymbol};
 use crate::core::symbols::symbol_keys::{ClassKey, ModuleKey, SourceFileKey, SymbolKey};
 use crate::core::symbols::storage::SymbolTable;
@@ -745,6 +746,9 @@ fn complete_string_literal(session: &mut SessionInfo, file: SourceFileKey, expr_
                     None => "",
                 };
                 for (model_name, model) in models.iter() {
+                    if !model.borrow_mut().has_symbols(&session.st()) {
+                        continue;
+                    }
                     if model_name.starts_with(prefix) && model_name != "_unknown" {
                         let label = model_name.clone();
                         let insert_text = model_name.strip_prefix(prefix_head).map(|s| s.to_string());
@@ -937,8 +941,8 @@ fn complete_name(session: &mut SessionInfo, file: SourceFileKey, offset: usize, 
     let symbols = session.st().get_all_inferred_names(scope, name, offset as u32);
     Some(CompletionResponse::List(CompletionList {
         is_incomplete: false,
-        items: symbols.into_iter().map(|(_symbol_name, symbols)| {
-            build_completion_item_from_symbol(session, symbols, Context::default())
+        items: symbols.into_iter().map(|(symbol_name, symbols)| {
+            build_completion_item_from_symbol(session, symbols, &symbol_name, Context::default())
         }).collect::<Vec<_>>(),
     }))
 }
@@ -1101,9 +1105,27 @@ fn add_nested_field_names(
             }
         } else {
             let field_symbols = deep_field_walker.get_model_fields(session, base_symbol, name);
-            for symbol in field_symbols.iter() {
-                if SymbolTable::is_specific_field(session, *symbol, &["Date", "Datetime"]) {
-                    date_mode = true;
+            if !add_date_completions {
+                continue;
+            }
+            for symbol in field_symbols {
+                match symbol {
+                    SymbolKey::Variable(_) => {
+                        if SymbolTable::is_specific_field(session, symbol, &["Date", "Datetime"]) {
+                            date_mode = true;
+                        }
+                    }
+                    SymbolKey::XmlRecord(key) => {
+                        let Some(ttype) =
+                            session.st()[key].get_field_text(XmlFieldName::Type, session.st())
+                        else {
+                            continue;
+                        };
+                        if ["date", "datetime"].contains(&ttype.as_str()) {
+                            date_mode = true;
+                        }
+                    }
+                    _ => {}
                 }
             }
         }
@@ -1142,12 +1164,12 @@ fn add_model_attributes(
         }
         if symbol_name.starts_with(attribute_name) {
             let context_of_symbol = Context::from_iter([(ContextKey::BaseAttr, ContextValue::SYMBOL(parent_sym.into()))]);
-            items.push(build_completion_item_from_symbol(session, vec![*final_sym], context_of_symbol));
+            items.push(build_completion_item_from_symbol(session, vec![*final_sym], &symbol_name, context_of_symbol));
         }
     }
 }
 
-fn build_completion_item_from_symbol(session: &mut SessionInfo, symbols: Vec<SymbolKey>, context_of_symbol: Context) -> CompletionItem {
+fn build_completion_item_from_symbol(session: &mut SessionInfo, symbols: Vec<SymbolKey>, symbol_name: &str, context_of_symbol: Context) -> CompletionItem {
     if symbols.is_empty() {
         return CompletionItem::default();
     }
@@ -1172,7 +1194,7 @@ fn build_completion_item_from_symbol(session: &mut SessionInfo, symbols: Vec<Sym
     };
 
     CompletionItem {
-        label: session.st().name(symbols[0]).to_string(),
+        label: symbol_name.to_string(),
         label_details: Some(CompletionItemLabelDetails {
             detail: None,
             description: label_details_description,
@@ -1213,8 +1235,8 @@ fn get_sort_text_for_symbol(symbol_table: &SymbolTable, sym: SymbolKey/*, cl: Op
         None => S!("")
     };*/
     //TODO use cl and cl_to_complete
-    let name = symbol_table.name(sym);
-    let mut text = "}".repeat(base_dist as usize)/* + cl_name.as_str()*/ + name;
+    let name = symbol_table.repr(sym);
+    let mut text = "}".repeat(base_dist as usize)/* + cl_name.as_str()*/ + &name;
     if name.starts_with("_") {
         text = "~".to_string() + text.as_str();
     }

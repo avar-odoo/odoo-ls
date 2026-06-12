@@ -225,7 +225,7 @@ impl XmlValidator {
                 let record = &session.st()[xml_data_record];
                 match (record.model.0.as_str(), field_name.as_str()) {
                     ("ir.ui.view", "model") | ("ir.actions.act_window", "res_model") => {
-                        let model = session.sync_odoo.models.get(&Sy!(field_text.clone())).cloned();
+                        let model = session.sync_odoo.models.get(field_text.as_str()).cloned();
                         let model_exists = model.as_ref().map(|m| m.borrow_mut().has_symbols(session.st())).unwrap_or(false);
                         if !model_exists {
                             missing_model_dependencies.insert(Sy!(field_text.clone()));
