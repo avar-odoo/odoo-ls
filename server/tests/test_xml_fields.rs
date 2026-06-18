@@ -348,4 +348,36 @@ fn test_xml_fields_def_hover_completion() {
         "Nested field completion at x_other_model.x should include x_name; got: {:?}",
         nested_field_labels
     );
+
+    // 4) Completion for delegated fields through `_inherits` delegation inheritance.
+    //    `x_delegating_model` delegates to `x_parent_model` (see delegation_model.py),
+    //    so a search domain on the delegating model must surface the delegated field
+    //    `parent_only_field` next to its own fields (`parent_id`, `own_field`).
+    let py_source_inherits = py_test_source("x_delegating_model", "parent_");
+    simulate_file_change(&mut session, &py_file_path, &py_source_inherits, 5);
+
+    let py_file_info = file_mgr.borrow().get_file_info(&py_file_path).unwrap();
+    let Some(py_file_symbol) = SyncOdoo::get_symbol_of_opened_file(
+        &mut session,
+        &PathBuf::from(&py_file_path),
+    ) else {
+        panic!("Failed to get symbol for {} after didChange", py_file_path);
+    };
+    let inherits_field_labels = completion_labels(CompletionFeature::autocomplete(
+        &mut session,
+        py_file_symbol,
+        &py_file_info,
+        6,
+        53,
+    ));
+    assert!(
+        inherits_field_labels.iter().any(|label| label == "parent_only_field"),
+        "Domain completion on a model with `_inherits` should include the delegated field parent_only_field; got: {:?}",
+        inherits_field_labels
+    );
+    assert!(
+        inherits_field_labels.iter().any(|label| label == "parent_id"),
+        "Domain completion should still include the delegation field parent_id; got: {:?}",
+        inherits_field_labels
+    );
 }
