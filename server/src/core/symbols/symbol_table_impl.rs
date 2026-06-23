@@ -1011,14 +1011,8 @@ impl SymbolTable {
                         session.sync_odoo.add_to_validations(sym);
                     }
                 }
-                for class in session.st().iter_classes(ref_to_inv.into()) {
-                    if let Some(model_data) = &session.st()[class]._model {
-                        let model = session.sync_odoo.models.get(&model_data.name).cloned();
-                        if let Some(model) = model {
-                            let from_module = session.st().find_module(class);
-                            model.borrow().add_dependents_to_validation(session, from_module);
-                        }
-                    }
+                for (model, from_module) in session.st().iter_all_model_keys(session, ref_to_inv.into()) {
+                    model.borrow().add_dependents_to_validation(session, from_module);
                 }
             }
             if [BuildSteps::ARCH, BuildSteps::ARCH_EVAL, BuildSteps::VALIDATION].contains(&step) && in_workspace {
@@ -2238,6 +2232,85 @@ impl SymbolTable {
 
         res
     }
+
+    /// Look for symbols that are implementing models, starting from a given symbol key.
+    fn iter_all_model_keys(
+        &self,
+        session: &SessionInfo,
+        key: SymbolKey,
+    ) -> Vec<(Rc<RefCell<Model>>, Option<ModuleKey>)> {
+        let mut res = vec![];
+
+        fn iter_recursive(
+            session: &SessionInfo,
+            key: SymbolKey,
+            res: &mut Vec<(Rc<RefCell<Model>>, Option<ModuleKey>)>,
+        ) {
+            let table = session.st();
+            match key {
+                SymbolKey::Class(class) => {
+                    if let Some(model_data) =
+                        session.st()[class]._model.as_ref().and_then(|model_data| {
+                            session.sync_odoo.models.get(&model_data.name).cloned()
+                        })
+                    {
+                        res.push((model_data, session.st().find_module(class)));
+                    }
+                    let class_sym = &table[class];
+                    for child_key in iter_symbol_keys(class_sym) {
+                        iter_recursive(session, *child_key, res);
+                    }
+                }
+                SymbolKey::File(f) => {
+                    let file_sym = &table[f];
+                    for child_key in iter_symbol_keys(file_sym) {
+                        iter_recursive(session, *child_key, res);
+                    }
+                }
+                SymbolKey::Function(f) => {
+                    let func_sym = &table[f];
+                    for child_key in iter_symbol_keys(func_sym) {
+                        iter_recursive(session, *child_key, res);
+                    }
+                }
+                SymbolKey::XmlFile(xml_file) => {
+                    let xml_file_sym = &table[xml_file];
+                    for child_key in xml_file_sym.children() {
+                        iter_recursive(session, child_key, res);
+                    }
+                }
+                SymbolKey::XmlRecord(xml_record_key) => {
+                    let xml_record_sym = &table[xml_record_key];
+                    if let Some(model) = SymbolTable::get_xml_defined_model(session, xml_record_key)
+                    {
+                        res.push((model, session.st().find_module(xml_record_key)));
+                    }
+                    for child_key in xml_record_sym.children() {
+                        iter_recursive(session, child_key, res);
+                    }
+                }
+                SymbolKey::DiskDir(_)
+                | SymbolKey::Root(_)
+                | SymbolKey::Namespace(_)
+                | SymbolKey::PythonPackage(_)
+                | SymbolKey::Module(_)
+                | SymbolKey::Compiled(_)
+                | SymbolKey::Variable(_)
+                | SymbolKey::XmlField(_)
+                | SymbolKey::XmlMenuItem(_)
+                | SymbolKey::XmlTemplate(_)
+                | SymbolKey::XmlAsset(_)
+                | SymbolKey::XmlDelete(_)
+                | SymbolKey::CsvFile(_) => {}
+            }
+        }
+
+        iter_recursive(session, key, &mut res);
+
+        res
+    }
+
+
 
     pub fn get_lsp_symbol_kind(target: SymbolKey) -> SymbolKind {
         match target.typ() {

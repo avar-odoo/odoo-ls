@@ -73,6 +73,9 @@ impl PythonOdooBuilder {
                             ..diagnostic
                         });
                     }
+                    if let Some(file_sym) = session.st().get_file(self.symbol.into()) {
+                        session.sync_odoo.symbol_table.add_model_dependencies(file_sym, &model);
+                    }
                 } else {
                     model.borrow_mut().add_symbol(session, sym)
                 }
