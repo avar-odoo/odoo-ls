@@ -1,12 +1,11 @@
 use std::rc::Rc;
 use std::cell::RefCell;
 use ruff_python_ast::Expr;
-use lsp_types::{Diagnostic, Position, Range};
+use lsp_types::Diagnostic;
 use tracing::error;
 
 use crate::constants::OYarn;
 use crate::core::evaluation_context::ContextKey;
-use crate::core::diagnostics::{DiagnosticCode, create_diagnostic};
 use crate::core::model::{Model, ModelData};
 use crate::core::symbols::{ClassSymbol, ModuleSymbol};
 use crate::core::symbols::storage::SymbolTable;
@@ -62,17 +61,6 @@ impl PythonOdooBuilder {
         match session.sync_odoo.models.get(&model_name).cloned() {
             Some(model) => {
                 if model.borrow().has_xml_symbols(&session.st()) {
-                    if let Some(diagnostic) =
-                        create_diagnostic(&session, DiagnosticCode::OLS03303, &[&model_name])
-                    {
-                        diagnostics.push(Diagnostic {
-                            range: Range::new(
-                                Position::new(session.st().range(sym.into()).start().to_u32(), 0),
-                                Position::new(session.st().range(sym.into()).end().to_u32(), 0),
-                            ),
-                            ..diagnostic
-                        });
-                    }
                     if let Some(file_sym) = session.st().get_file(self.symbol.into()) {
                         session.sync_odoo.symbol_table.add_model_dependencies(file_sym, &model);
                     }

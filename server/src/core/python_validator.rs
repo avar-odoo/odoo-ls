@@ -9,7 +9,7 @@ use crate::core::diagnostics::{create_diagnostic, DiagnosticCode};
 use crate::core::evaluation_context::{ContextKey, ContextValue};
 use crate::core::symbols::storage::SymbolTable;
 use crate::core::symbols::storage::xml::xml_field_symbol::XmlFieldName;
-use crate::core::symbols::symbol_keys::{ClassKey, ModuleKey, SourceFileKey, SymbolKey};
+use crate::core::symbols::symbol_keys::{ClassKey, ModelSymbolKey, ModuleKey, SourceFileKey, SymbolKey};
 use crate::{constants::*, oyarn};
 use crate::core::odoo::SyncOdoo;
 use crate::core::symbols::ModuleSymbol;
@@ -669,9 +669,15 @@ impl PythonValidator {
         };
         let inherited_model_names = session.st()[class]._model.as_ref().unwrap().inherit.clone();
         if !inherited_model_names.contains(&model_name)
-        && model.borrow().get_main_symbols(session, maybe_from_module).into_iter().filter(|&main_sym| {
-            main_sym != class.into()
-        }).count() > 0 {
+            // Defining it here because it is an expensive call
+            && let conflicting_symbols = model
+                .borrow()
+                .get_main_symbols(session, maybe_from_module)
+                .into_iter()
+                .filter(|&main_sym| main_sym != class.into())
+                .collect::<Vec<_>>()
+            && !conflicting_symbols.is_empty()
+        {
             // This a model with a name that already exists in models and in dependencies,
             // and it is not inherited, so it is basically shadowing the existing model.
             let _name = session.st().get_symbol(class.into(), (&[], &["_name"]), u32::MAX);
@@ -687,7 +693,13 @@ impl PythonValidator {
                 ) {
                     range = TextRange::new(range.start(), eval_range.end());
                 }
-                if let Some(diagnostic) = create_diagnostic(&session, DiagnosticCode::OLS03020, &[&model_name]) {
+                let has_xml_model_conflict = conflicting_symbols.iter().any(|key| matches!(key, ModelSymbolKey::XmlRecord(_)));
+                let diagnostic_code = if has_xml_model_conflict {
+                    DiagnosticCode::OLS03303
+                } else {
+                    DiagnosticCode::OLS03020
+                };
+                if let Some(diagnostic) = create_diagnostic(&session, diagnostic_code, &[&model_name]) {
                     self.diagnostics.push(Diagnostic {
                         range: FileMgr::textRange_to_temporary_Range(&range),
                         ..diagnostic
