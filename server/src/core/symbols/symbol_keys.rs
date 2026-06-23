@@ -2,24 +2,26 @@ use slotmap::{Key, new_key_type};
 
 use crate::constants::{PackageType, SymType};
 
-new_key_type! { pub struct RootKey; }
-new_key_type! { pub struct DiskDirKey; }
-new_key_type! { pub struct NamespaceKey; }
-new_key_type! { pub struct PythonPackageKey; }
-new_key_type! { pub struct ModuleKey; }
-new_key_type! { pub struct FileKey; }
-new_key_type! { pub struct CompiledKey; }
-new_key_type! { pub struct ClassKey; }
-new_key_type! { pub struct FunctionKey; }
-new_key_type! { pub struct VariableKey; }
-new_key_type! { pub struct XmlFileKey; }
-new_key_type! { pub struct XmlRecordKey; }
-new_key_type! { pub struct XmlFieldKey; }
-new_key_type! { pub struct XmlMenuItemKey; }
-new_key_type! { pub struct XmlTemplateKey; }
-new_key_type! { pub struct XmlAssetKey; }
-new_key_type! { pub struct XmlDeleteKey; }
-new_key_type! { pub struct CsvFileKey; }
+new_key_type! {
+    pub struct RootKey;
+    pub struct DiskDirKey;
+    pub struct NamespaceKey;
+    pub struct PythonPackageKey;
+    pub struct ModuleKey;
+    pub struct FileKey;
+    pub struct CompiledKey;
+    pub struct ClassKey;
+    pub struct FunctionKey;
+    pub struct VariableKey;
+    pub struct XmlFileKey;
+    pub struct XmlRecordKey;
+    pub struct XmlFieldKey;
+    pub struct XmlMenuItemKey;
+    pub struct XmlTemplateKey;
+    pub struct XmlAssetKey;
+    pub struct XmlDeleteKey;
+    pub struct CsvFileKey;
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum SymbolKey {
