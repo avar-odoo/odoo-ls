@@ -4,7 +4,7 @@ use lsp_types::{Diagnostic, Position, Range};
 use roxmltree::Node;
 use ruff_text_size::{TextRange, TextSize};
 
-use crate::{Sy, constants::OYarn, core::{diagnostics::{DiagnosticCode, create_diagnostic}, model::Model, odoo::SyncOdoo, symbols::symbol_keys::{SymbolKey, XmlFieldKey, XmlId, XmlRecordKey}}, oyarn, threads::SessionInfo, utils};
+use crate::{Sy, constants::OYarn, core::{diagnostics::{DiagnosticCode, create_diagnostic}, model::Model, odoo::SyncOdoo, symbols::{storage::xml::xml_field_symbol::XmlFieldName, symbol_keys::{SymbolKey, XmlFieldKey, XmlId, XmlRecordKey}}}, oyarn, threads::SessionInfo, utils};
 
 use super::xml_arch_builder::XmlArchBuilder;
 
@@ -722,20 +722,10 @@ impl XmlArchBuilder {
             return;
         }
 
-        let maybe_model_name = xml_record_sym
-            .fields()
-            .iter()
-            .find_map(|(name, &field_key)| {
-                if name == "model" {
-                    session.st()[field_key]
-                        .text
-                        .as_ref()
-                        .map(|name| oyarn!("{}", name))
-                } else {
-                    None
-                }
-            });
-        let Some(model_name) = maybe_model_name else {
+        let Some(model_name) = xml_record_sym
+            .get_field_text(XmlFieldName::Model, session.st())
+            .map(|name| Sy!(name))
+        else {
             return;
         };
         let model = session
@@ -758,10 +748,8 @@ impl XmlArchBuilder {
             return;
         }
 
-        let model_name: OYarn = if let Some((_name, &field_sym_key)) = xml_record_sym
-            .fields()
-            .iter()
-            .find(|(name, _)| *name == "model_id")
+        let model_name: OYarn = if let Some(&field_sym_key) =
+            xml_record_sym.fields().get(XmlFieldName::ModelId.as_str())
         {
             let field_sym = &session.st()[field_sym_key];
             let Some((ref_key, ref_range)) = field_sym.ref_key.clone() else {
@@ -802,16 +790,10 @@ impl XmlArchBuilder {
                 Some(model_name) => model_name,
                 None => return,
             }
-        } else if let Some((_, &field)) = xml_record_sym
-            .fields()
-            .iter()
-            .find(|(name, _)| *name == "model")
+        } else if let Some(model_name) =
+            xml_record_sym.get_field_text(XmlFieldName::Model, session.st())
         {
-            let field = &session.st()[field];
-            let Some(name) = field.text.clone() else {
-                return;
-            };
-            Sy!(name)
+            Sy!(model_name)
         } else {
             return;
         };

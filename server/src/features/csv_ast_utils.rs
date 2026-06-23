@@ -3,6 +3,7 @@ use lsp_types::Range;
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::core::evaluation_utils::DeepFieldEvalWalker;
+use crate::core::symbols::storage::xml::xml_field_symbol::XmlFieldName;
 use crate::core::symbols::symbol_keys::CsvFileKey;
 use crate::features::goto_utils::GotoSource;
 use crate::{
@@ -230,7 +231,7 @@ impl CsvAstUtils {
                         let record = &session.st()[record_key];
                         let Some(record_xml_id) = &record.xml_id else {continue;};
                         if record.range.contains_range(field_range) && field_data == *record_xml_id {
-                            if let Some(xml_id) = record.fields().get("id") {
+                            if let Some(xml_id) = record.fields().get(XmlFieldName::Id.as_str()) {
                                 results.push(GotoSource {
                                     source: (*xml_id).into(),
                                     origin_selection_range: None,
@@ -242,7 +243,7 @@ impl CsvAstUtils {
                 }
             //in case of relational field, return the field in the related model
             } else if let Some(&relational_field) = relational_field
-            && relational_field == "id"  // Only id because we will only look for xml_ids
+            && relational_field == XmlFieldName::Id.as_str()  // Only id because we will only look for xml_ids
             {
                 // 1. find relational field in current model
                 let mut deep_field_walker = DeepFieldEvalWalker::new(main_symbol.into(), module);

@@ -47,11 +47,16 @@ impl XmlFieldSymbol {
 }
 
 /// Enum for the possible field names of an xml field symbol, used to get the text of these fields in a type safe way
+// Add a new enum values as needed
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
 pub enum XmlFieldName {
     Name,
     Type,
     Relation,
+    Model,
+    ModelId,
+    Code,
+    Id,
 }
 
 impl XmlFieldName {
@@ -60,6 +65,10 @@ impl XmlFieldName {
             XmlFieldName::Name => "name",
             XmlFieldName::Type => "ttype",
             XmlFieldName::Relation => "relation",
+            XmlFieldName::Model => "model",
+            XmlFieldName::ModelId => "model_id",
+            XmlFieldName::Code => "code",
+            XmlFieldName::Id => "id",
         }
     }
 }
