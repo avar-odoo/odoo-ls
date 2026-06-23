@@ -90,11 +90,8 @@ impl DeepFieldEvalWalker {
         name: &str,
     ) -> Vec<SymbolKey> {
         let symbols = match base_object {
-            SymbolKey::XmlRecord(key) => {
-                let rec = &session.st()[key];
-                if let Some(model_name) = rec.get_declared_model()
-                    && let Some(model) = session.sync_odoo.models.get(model_name)
-                {
+            SymbolKey::XmlRecord(xml_record_key) => {
+                if let Some(model) = SymbolTable::get_xml_defined_model(session, xml_record_key) {
                     model
                         .borrow()
                         .get_xml_model_field_symbols(session.st(), self.from_module)

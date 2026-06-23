@@ -103,7 +103,7 @@ impl Model {
         self.add_dependents_to_validation(session, from_module);
 
         if let ModelSymbolKey::XmlRecord(xml_key) = key {
-            session.st_mut()[xml_key].set_declared_model(self.name.clone());
+            session.st_mut().set_declared_model(xml_key, self.name.clone());
         }
     }
 

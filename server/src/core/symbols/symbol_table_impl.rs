@@ -5,13 +5,9 @@ use std::{
     rc::Rc,
 };
 use crate::{
-    Sy,
-    core::{
-        evaluation_context::ContextKey, python_arch_eval_hooks::get_base_model_symbol,
-        symbols::storage::xml::xml_field_symbol::XmlFieldName,
-    },
-    oyarn,
-    utils::{HashMap, HashSet},
+    Sy, core::{
+        evaluation_context::ContextKey, python_arch_eval_hooks::get_base_model_symbol, symbols::{storage::xml::xml_field_symbol::XmlFieldName, symbol_keys::XmlRecordKey},
+    }, oyarn, utils::{HashMap, HashSet},
 };
 
 use lsp_types::{Diagnostic, DiagnosticTag, Range, SymbolKind};
@@ -1666,14 +1662,10 @@ impl SymbolTable {
                     Self::_all_members(base.into(), session, result, false, only_fields, only_methods, from_module, acc, false);
                 }
             }
-            SymbolKey::XmlRecord(key) => {
+            SymbolKey::XmlRecord(xml_record_key) => {
                 // If it is a model-defining record
                 // return the field symbols of the record alongside their names
-                let record = &session.st()[key];
-                let Some(model_name) = record.get_declared_model() else {
-                    return;
-                };
-                let Some(model) = session.sync_odoo.models.get(model_name).cloned() else {
+                let Some(model) = SymbolTable::get_xml_defined_model(session, xml_record_key) else {
                     return;
                 };
                 let model_ref = model.borrow();
@@ -2042,9 +2034,8 @@ impl SymbolTable {
                 }
             }
         }
-        if let SymbolKey::XmlRecord(key) = target
-            && let Some(model_name) = session.st()[key].get_declared_model()
-            && let Some(model) = session.sync_odoo.models.get(model_name).cloned()
+        if let SymbolKey::XmlRecord(xml_record_key) = target
+            && let Some(model) = SymbolTable::get_xml_defined_model(session, xml_record_key)
         {
             let model_ref = model.borrow();
             let fields = model_ref.get_xml_model_field_symbols(&session.st(), from_module);
@@ -2312,5 +2303,10 @@ impl SymbolTable {
                 }
             }
         }
+    }
+
+    pub fn get_xml_defined_model(session: &SessionInfo, xml_record_key: XmlRecordKey) -> Option<Rc<RefCell<Model>>> {
+        let model_name = session.st().get_declared_model(xml_record_key)?;
+        session.sync_odoo.models.get(model_name).cloned()
     }
 }
