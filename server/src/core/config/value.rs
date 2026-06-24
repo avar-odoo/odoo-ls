@@ -6,7 +6,7 @@
 //! internal `Scalar`/`ConfigValue` representation, and the `Profile` working
 //! structure. The field-declaration machinery (`FieldSpec`, the registry) lives
 //! in `spec.rs`.
-
+// TODO: continue the review here
 use std::hash::Hash;
 use std::path::PathBuf;
 
@@ -301,7 +301,7 @@ pub(super) fn config_dir(sources: &HashSet<String>) -> PathBuf {
 }
 
 // ---------------------------------------------------------------------------
-// Value model
+// Configuration Value model
 // ---------------------------------------------------------------------------
 
 /// A resolved scalar. Enum-valued settings (e.g. `diag_missing_imports`,
