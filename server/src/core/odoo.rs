@@ -730,7 +730,7 @@ impl SyncOdoo {
             token: ProgressToken::Number(session.sync_odoo.progress_token),
             value: ProgressParamsValue::WorkDone(WorkDoneProgress::Begin(WorkDoneProgressBegin {
                 title: "Odoo: Indexing".to_string(),
-                cancellable: Some(false),
+                cancellable: Some(true),
                 message: None,
                 percentage: None,
             }))
@@ -765,7 +765,7 @@ impl SyncOdoo {
                 session.send_notification(Progress::METHOD, ProgressParams {
                     token: ProgressToken::Number(session.sync_odoo.progress_token),
                     value: ProgressParamsValue::WorkDone(WorkDoneProgress::Report(WorkDoneProgressReport {
-                        cancellable: Some(false),
+                        cancellable: Some(true),
                         message: Some(format!("{} items remaining", queue_size)),
                         percentage: None,
                     }))
